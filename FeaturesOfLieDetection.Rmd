@@ -1,0 +1,288 @@
+---
+title: "FeaturesOfLieDetection"
+author: "Mark Rayev"
+date: "November 11, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      message = F,
+                      warning = F)
+```
+
+
+# Load the data  
+
+```{r}
+load("E1/data-E1-typing.Rda")
+```
+
+# some design notes
+
+1. Each subject wrote 4 paragraphs, 1 per condition
+2. Everyone listed top 2 favorite movies, and bottom 2 hated movies
+3. For top 2 favorite, randomly assigned to positve and negative reccomendation conditions
+4. For bottom 2, randomly assigned to positve and negative reccomendation conditions
+
+positive recomendation: write a short paragraph reccommending this movie to someone
+negative recomendation: write a short paragraph not reccommending this movie to someone
+
+IKSI: interkeystroke interval (milliseconds)
+
+# Big question
+
+What features predict whether people are lying or not (congruent vs. incongruent)
+
+# Pre-processing
+
+```{r}
+
+max(typing$IKSI)
+hist(typing$IKSI)
+```
+
+
+## Mean IKSI
+
+Write a blurb explaining what this feature is...
+
+```{r}
+library(dplyr)
+
+subject_meansA <- typing %>% 
+                 group_by(workerId,condition) %>%
+                 summarize(mean_iksi = mean(IKSI))
+
+condition_means <- subject_meansA %>%
+                   group_by(condition) %>%
+                   summarize(mean_iksi = mean(mean_iksi))
+
+t.test(mean_iksi~condition, paired=TRUE, data=subject_meansA)
+
+difference_scores <- subject_meansA[subject_meansA$condition=="incongruent",]$mean_iksi - subject_meansA[subject_meansA$condition=="congruent",]$mean_iksi
+
+mean(difference_scores)
+sd(difference_scores)
+
+cohens_d <- mean(difference_scores)/sd(difference_scores)
+cohens_d
+
+congruency_labels <- subject_meansA$condition
+congruency_labels <- as.factor(congruency_labels)
+congruency_labels <- as.numeric(congruency_labels)
+
+category_guess<-c()
+for (i in difference_scores){
+  if(i<=0){
+    category_guess <- c(category_guess, 2,1)
+  } else {
+    category_guess <- c(category_guess, 1,2)
+  }
+}
+
+category_guess <-as.factor(category_guess)
+
+subject_meansA <- cbind(subject_meansA, 
+                        clabels = congruency_labels,
+                        c_guess = category_guess)
+
+subject_meansA <- subject_meansA %>%
+                    mutate(accuracy = (clabels==c_guess))
+
+mean(subject_meansA$accuracy)
+  
+
+
+
+
+knitr::kable(condition_means)
+
+```
+
+
+## first-letter IKSI
+
+Write a blurb explaining what this feature is...
+
+```{r}
+
+
+subject_means <- typing %>% 
+                 filter(word_unedited_letterPos == 1) %>%
+                 group_by(workerId,condition) %>%
+                 summarize(mean_iksi = mean(IKSI))
+
+View(subject_means)
+
+# check
+# unique(table(subject_means$workerId))
+
+t.test(mean_iksi~condition, paired=TRUE, data=subject_means)
+
+condition_means <- subject_means %>%
+                   group_by(condition) %>%
+                   summarize(mean_iksi = mean(mean_iksi))
+
+knitr::kable(condition_means)
+
+```
+
+
+# list some features
+
+- number of words in paragraph
+- number of typos...(number of backspaces)
+- first letter IKSI
+- non-first letter IKSIs
+- total time to write paragraph
+- average word length
+
+unique_names <- unique(df_sorted$topic)
+
+
+#Number of words in paragraph
+```{r}
+library (ngram)
+
+
+library(splitstackshape)
+library(dplyr)
+
+
+library(sqldf)
+
+x <- sqldf('SELECT workerId, condition, uneditedText FROM response GROUP BY workerId, condition, uneditedText ')
+
+x$wordCount <- 0
+
+View (x)
+
+for(i in 1:nrow(x)) 
+{
+  x[i,4] <- wordcount(x[i,3])
+}
+
+#by(x, 1:nrow(x), function(row){ row$wordCount <- wordcount(x[i,3]})
+
+totalWords_means <- x %>% 
+                 group_by(workerId,condition) %>%
+                 summarize(mean_words = mean(wordCount))
+
+t.test(mean_words~condition, paired=TRUE, data=totalWords_means)
+
+condition_means_totalWords <- totalWords_means %>%
+                   group_by(condition) %>%
+                   summarize(mean_words = mean(mean_words))
+```
+#Typos
+```{r}
+num_typos <- typing %>% 
+                 group_by(workerId, condition) %>%
+                 summarize(total_typos = sum(backspace))
+
+t.test(total_typos~condition, paired=TRUE, data=num_typos)
+
+condition_typos_means <- num_typos %>%
+                   group_by(condition) %>%
+                   summarize(total_typos = mean(total_typos))
+```
+
+
+
+## non-first-letter IKSI
+
+
+```{r}
+
+
+subject_means_nonFirst <- typing %>% 
+                 filter(word_unedited_letterPos != 1) %>%
+                 group_by(workerId,condition) %>%
+                 summarize(mean_iksi = mean(IKSI))
+
+View (subject_means_nonFirst)
+
+# check
+# unique(table(subject_means$workerId))
+
+t.test(mean_iksi~condition, paired=TRUE, data=subject_means_nonFirst)
+
+condition_means <- subject_means_nonFirst %>%
+                   group_by(condition) %>%
+                   summarize(mean_iksi = mean(mean_iksi))
+
+
+```
+
+
+
+##RT
+```{r}
+duration_df <- sqldf('SELECT workerId, condition, RT FROM response GROUP BY workerId, condition, RT ')
+View (duration_df)
+
+totalRT_means <- duration_df %>% 
+                 group_by(workerId,condition) %>%
+                 summarize(mean_RT = mean(RT))
+
+t.test(mean_RT~condition, paired=TRUE, data=totalRT_means)
+
+condition_means_totalRT <- totalRT_means %>%
+                   group_by(condition) %>%
+                   summarize(mean_RT = mean(mean_RT))
+
+```
+
+
+##Word Length
+```{r}
+word_length_df <- sqldf('SELECT workerId, condition, word_unedited_length FROM typing GROUP BY workerId, condition, word_unedited_length ')
+
+word_length_df <- sqldf('SELECT * FROM typing ')
+
+View (word_length_df)
+
+word_length <- word_length_df %>% 
+                 group_by(workerId,condition) %>%
+                 summarize(word_length_mean = mean(word_unedited_length))
+
+
+```
+
+
+
+# some checks
+```{r}
+
+
+length(unique(subject_meansA$workerId))
+length(unique(subject_means$workerId))
+
+which(subject_meansA$workerId %in% subject_means$workerId ==FALSE)
+
+subject_meansA[311,]
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
