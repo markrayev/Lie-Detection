@@ -17,7 +17,7 @@ knitr::opts_chunk$set(echo = TRUE,
 ```
 
 
-# Load the data   
+# Load the data
 
 ```{r}
 load("E1/data-E1-typing.Rda")
