@@ -190,7 +190,7 @@ condition_typos_means <- num_typos %>%
 
 
 
-## non-first-letter IKSI 
+## non-first-letter IKSI  
 
 
 ```{r}
